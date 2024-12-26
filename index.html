@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freshly Desi POS</title>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <header class="header">
+        <button class="fullscreen-btn" onclick="toggleFullscreen()">
+            Toggle Fullscreen
+        </button>
+        <div class="container">
+            <h1>Freshly Desi</h1>
+            <p>Fresh • Local • Delicious</p>
+            <div class="header-info">
+                <div id="current-date"></div>
+                <div>Daily Total: ₹<span id="daily-total">0</span></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="main-content">
+            <div class="menu-section">
+                <div class="tabs" id="category-tabs"></div>
+                <div class="menu-items" id="menu-items"></div>
+            </div>
+
+            <div class="orders-section">
+                <div class="order-card">
+                    <h2 class="card-title">Current Order</h2>
+                    <div id="current-cart"></div>
+                    <div class="cart-total">
+                        <span>Total</span>
+                        <span>₹<span id="cart-total">0</span></span>
+                    </div>
+                    <button class="place-order-btn" id="place-order-btn" disabled>Place Order</button>
+                </div>
+
+                <div class="order-card">
+                    <h2 class="card-title">Pending Orders</h2>
+                    <div id="pending-orders"></div>
+                </div>
+
+                <div class="order-card">
+                    <h2 class="card-title">Completed Orders</h2>
+                    <div id="completed-orders"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <h2>Confirm Order</h2>
+            <div id="confirm-order-details"></div>
+            <div class="modal-actions">
+                <button class="modal-btn btn-cancel" id="cancel-order">Cancel</button>
+                <button class="modal-btn btn-confirm" id="confirm-order">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Payment Modal -->
+    <div id="payment-modal" class="modal">
+        <div class="modal-content">
+            <h2>Payment Status</h2>
+            <p class="mb-4">Total Amount: ₹<span id="payment-amount">0</span></p>
+            <div class="modal-actions">
+                <button class="modal-btn btn-payment-received" id="payment-received">Payment Received</button>
+                <button class="modal-btn btn-payment-pending" id="payment-pending">Payment Pending</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script src="js/main.js"></script>
+</body>
+</html>
