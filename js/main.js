@@ -191,19 +191,76 @@ function handlePayment(orderId) {
         order.paid = true;
         
         // Check if all items are already served
-        const allCompleted = order.items.every(item => item.completed === item.quantity);
+        const allItemsCompleted = order.items.every(item => item.completed === item.quantity);
         
         // If everything is served and now paid, move to completed
-        if (allCompleted) {
-            completedOrders.push({...order, status: 'completed'});
+        if (allItemsCompleted) {
+            completedOrders.push({
+                ...order,
+                status: 'completed',
+                completedAt: new Date()
+            });
             orders.splice(orderIndex, 1);
             dailyTotal += order.total;
+            showNotification('Order completed and moved to completed orders!');
+        } else {
+            showNotification('Payment received successfully!');
         }
         
         hidePaymentModal();
         updateOrdersUI();
-        showNotification('Payment received successfully!');
+        saveState(); // Save state after important changes
     }
+}
+
+function completeOrderItem(orderId, itemName, quantity) {
+    const orderIndex = orders.findIndex(o => o.id === orderId);
+    if (orderIndex !== -1) {
+        const order = orders[orderIndex];
+        const item = order.items.find(i => i.name === itemName);
+        
+        if (item) {
+            // Update completed quantity
+            item.completed = Math.min(item.quantity, item.completed + quantity);
+            
+            // Check if all items in this order are completed
+            const allItemsCompleted = order.items.every(item => item.completed === item.quantity);
+            order.allCompleted = allItemsCompleted;
+
+            // If all items are completed and order is paid, move to completed orders
+            if (allItemsCompleted && order.paid) {
+                completedOrders.push({
+                    ...order,
+                    status: 'completed',
+                    completedAt: new Date()
+                });
+                orders.splice(orderIndex, 1);
+                dailyTotal += order.total;
+                showNotification('Order completed!');
+            } else {
+                showNotification('Item served!');
+            }
+
+            updateOrdersUI();
+            saveState(); // Save state after important changes
+        }
+    }
+}
+
+function createOrder(items) {
+    return {
+        id: currentOrderId++,
+        items: Object.entries(items).map(([name, item]) => ({
+            name,
+            quantity: item.quantity,
+            price: item.price,
+            completed: 0  // Initialize completed count
+        })),
+        total: calculateTotal(items),
+        timestamp: new Date(),
+        paid: false,
+        allCompleted: false
+    };
 }
 
 function completeOrderItem(orderId, itemName, quantity) {
