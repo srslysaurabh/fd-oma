@@ -127,7 +127,6 @@ function updateOrdersUI() {
                             <button 
                                 class="complete-item-btn"
                                 onclick="completeOrderItem(${order.id}, '${item.name}', 1)"
-                                ${!order.paid ? 'disabled' : ''}
                             >
                                 Serve
                             </button>
@@ -274,9 +273,9 @@ function hideConfirmModal() {
     document.getElementById('confirm-modal').style.display = 'none';
 }
 
-function showPaymentModal() {
+function showPaymentModal(total) {
     const modal = document.getElementById('payment-modal');
-    document.getElementById('payment-amount').textContent = calculateTotal(cart);
+    document.getElementById('payment-amount').textContent = total;
     modal.style.display = 'flex';
 }
 
@@ -336,7 +335,8 @@ function initialize() {
     document.getElementById('confirm-order').addEventListener('click', confirmOrder);
     document.getElementById('payment-pending').addEventListener('click', hidePaymentModal);
     document.getElementById('payment-received').addEventListener('click', () => {
-        handlePayment(currentOrderId - 1);
+        const lastOrderId = currentOrderId - 1;
+        handlePayment(lastOrderId);
     });
 }
 
