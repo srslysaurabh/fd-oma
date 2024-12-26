@@ -375,16 +375,25 @@ function handlePayment(orderId) {
 }
 
 function confirmOrder() {
-    const newOrder = createOrder(cart);
-    orders.push(newOrder);
-    cart = {};
-    hideConfirmModal();
-    showPaymentModal(newOrder.id); // Pass the specific order ID
-    updateUI();
-    updateOrdersUI();
+    if (Object.keys(cart).length === 0) return;
     
-    // Save state to localStorage
-    saveState();
+    const modal = document.getElementById('confirm-modal');
+    const detailsContainer = document.getElementById('confirm-order-details');
+    
+    detailsContainer.innerHTML = `
+        ${Object.entries(cart).map(([name, item]) => `
+            <div class="cart-item">
+                <span>${name} x${item.quantity}</span>
+                <span>₹${item.price * item.quantity}</span>
+            </div>
+        `).join('')}
+        <div class="cart-total">
+            <span>Total</span>
+            <span>₹${calculateTotal(cart)}</span>
+        </div>
+    `;
+    
+    modal.style.display = 'flex';
 }
 
 function completeOrderItem(orderId, itemName, quantity) {
