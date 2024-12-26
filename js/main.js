@@ -187,7 +187,19 @@ function createOrder(items) {
 function handlePayment(orderId) {
     const orderIndex = orders.findIndex(o => o.id === orderId);
     if (orderIndex !== -1) {
-        orders[orderIndex].paid = true;
+        const order = orders[orderIndex];
+        order.paid = true;
+        
+        // Check if all items are already served
+        const allCompleted = order.items.every(item => item.completed === item.quantity);
+        
+        // If everything is served and now paid, move to completed
+        if (allCompleted) {
+            completedOrders.push({...order, status: 'completed'});
+            orders.splice(orderIndex, 1);
+            dailyTotal += order.total;
+        }
+        
         hidePaymentModal();
         updateOrdersUI();
         showNotification('Payment received successfully!');
@@ -273,11 +285,123 @@ function hideConfirmModal() {
     document.getElementById('confirm-modal').style.display = 'none';
 }
 
-function showPaymentModal(total) {
+let currentPaymentOrderId = null; // Add this at the top with other state variables
+
+function showPaymentModal(orderId) {
+    const order = orders.find(o => o.id === orderId);
+    if (!order) return;
+    
+    currentPaymentOrderId = orderId;
     const modal = document.getElementById('payment-modal');
-    document.getElementById('payment-amount').textContent = total;
+    document.getElementById('payment-amount').textContent = order.total;
     modal.style.display = 'flex';
 }
+
+function hidePaymentModal() {
+    currentPaymentOrderId = null;
+    document.getElementById('payment-modal').style.display = 'none';
+}
+
+function handlePayment(orderId) {
+    const orderIndex = orders.findIndex(o => o.id === orderId);
+    if (orderIndex !== -1) {
+        const button = event.target;
+        button.disabled = true; // Prevent double-clicks
+        
+        orders[orderIndex].paid = true;
+        hidePaymentModal();
+        updateOrdersUI();
+        showNotification('Payment received successfully!');
+        
+        button.disabled = false;
+    }
+}
+
+function confirmOrder() {
+    const newOrder = createOrder(cart);
+    orders.push(newOrder);
+    cart = {};
+    hideConfirmModal();
+    showPaymentModal(newOrder.id); // Pass the specific order ID
+    updateUI();
+    updateOrdersUI();
+    
+    // Save state to localStorage
+    saveState();
+}
+
+function completeOrderItem(orderId, itemName, quantity) {
+    const button = event.target;
+    button.disabled = true; // Prevent double-clicks
+    
+    const orderIndex = orders.findIndex(o => o.id === orderId);
+    if (orderIndex !== -1) {
+        const order = orders[orderIndex];
+        const item = order.items.find(i => i.name === itemName);
+        if (item) {
+            item.completed = Math.min(item.quantity, item.completed + quantity);
+            const allCompleted = order.items.every(item => item.completed === item.quantity);
+            order.allCompleted = allCompleted;
+
+            if (allCompleted && order.paid) {
+                completedOrders.push({...order, status: 'completed'});
+                orders.splice(orderIndex, 1);
+                dailyTotal += order.total;
+            }
+
+            updateOrdersUI();
+            showNotification(allCompleted ? 'Order completed!' : 'Item served!');
+            saveState();
+        }
+    }
+    
+    button.disabled = false;
+}
+
+// Add state persistence
+function saveState() {
+    const state = {
+        orders,
+        completedOrders,
+        dailyTotal,
+        currentOrderId
+    };
+    localStorage.setItem('posState', JSON.stringify(state));
+}
+
+function loadState() {
+    const savedState = localStorage.getItem('posState');
+    if (savedState) {
+        const state = JSON.parse(savedState);
+        orders = state.orders;
+        completedOrders = state.completedOrders;
+        dailyTotal = state.dailyTotal;
+        currentOrderId = state.currentOrderId;
+        updateUI();
+        updateOrdersUI();
+    }
+}
+
+// Update initialize function
+function initialize() {
+    // Existing initialization code...
+    
+    // Add payment modal event listeners
+    document.getElementById('payment-received').addEventListener('click', () => {
+        if (currentPaymentOrderId) {
+            handlePayment(currentPaymentOrderId);
+        }
+    });
+    
+    // Load saved state
+    loadState();
+}
+
+// Add error handling for all async operations
+window.addEventListener('error', function(e) {
+    console.error('Error:', e);
+    showNotification('An error occurred. Please try again.');
+});
 
 function hidePaymentModal() {
     document.getElementById('payment-modal').style.display = 'none';
