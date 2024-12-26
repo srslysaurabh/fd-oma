@@ -1,4 +1,4 @@
-// Menu Data
+// Menu Categories Data
 const menuCategories = {
     'Quick Bites': [
         { name: 'Veg Spring Rolls', price: 95 },
@@ -41,494 +41,345 @@ const menuCategories = {
     ],
 };
 
-// State management
-let currentOrderId = 1;
-let activeCategory = 'Quick Bites';
-let cart = {};
-let orders = [];
-let completedOrders = [];
-let dailyTotal = 0;
-
-// Initialize Lucide icons
-lucide.createIcons();
-
-// Utility Functions
-function calculateTotal(items) {
-    return Object.values(items).reduce((total, item) => {
-        return total + (item.quantity * item.price);
-    }, 0);
-}
-
-function updateQuantity(item, change) {
-    if (!cart[item.name]) {
-        cart[item.name] = { ...item, quantity: 0 };
+// Application State
+class POSState {
+    constructor() {
+        this.currentOrderId = 1;
+        this.activeCategory = 'Quick Bites';
+        this.cart = {};
+        this.pendingOrders = [];
+        this.completedOrders = [];
+        this.dailyTotal = 0;
     }
-    cart[item.name].quantity = Math.max(0, cart[item.name].quantity + change);
-    if (cart[item.name].quantity === 0) {
-        delete cart[item.name];
-    }
-    updateUI();
-}
 
-function showNotification(message) {
-    const notification = document.getElementById('notification');
-    notification.textContent = message;
-    notification.classList.add('show');
-    setTimeout(() => {
-        notification.classList.remove('show');
-    }, 3000);
-}
-
-// UI Update Functions
-function updateUI() {
-    // Update cart
-    const cartContainer = document.getElementById('current-cart');
-    cartContainer.innerHTML = Object.entries(cart)
-        .map(([name, item]) => `
-            <div class="cart-item">
-                <span>${name} x${item.quantity}</span>
-                <span>₹${item.price * item.quantity}</span>
-            </div>
-        `).join('');
-
-    // Update total
-    document.getElementById('cart-total').textContent = calculateTotal(cart);
-
-    // Update place order button
-    document.getElementById('place-order-btn').disabled = Object.keys(cart).length === 0;
-
-    // Update menu quantities
-    updateMenuItems();
-}
-
-function updateOrdersUI() {
-    // Update pending orders
-    const pendingOrdersContainer = document.getElementById('pending-orders');
-    pendingOrdersContainer.innerHTML = orders.length ? orders.map(order => `
-        <div class="pending-order">
-            <div class="order-header">
-                <span class="font-medium">Order #${order.id}</span>
-                <div class="order-actions">
-                    ${!order.paid ? `
-                        <button class="action-btn payment-btn" onclick="handlePayment(${order.id})">
-                            <i data-lucide="dollar-sign"></i>
-                        </button>
-                    ` : ''}
-                </div>
-            </div>
-            <div class="text-sm text-gray-600 mt-1">
-                ${order.items.map(item => `
-                    <div class="order-item-status ${item.completed === item.quantity ? 'completed' : ''}">
-                        <div>
-                            ${item.name} x${item.quantity}
-                            ${item.completed > 0 ? `(${item.completed} served)` : ''}
-                        </div>
-                        ${item.completed < item.quantity ? `
-                            <button 
-                                class="complete-item-btn"
-                                onclick="completeOrderItem(${order.id}, '${item.name}', 1)"
-                            >
-                                Serve
-                            </button>
-                        ` : ''}
-                    </div>
-                `).join('')}
-                <div class="mt-1">Total: ₹${order.total}</div>
-                <div class="text-xs mt-1">
-                    ${order.paid ? 
-                        '<span class="status-paid">Payment Received</span>' : 
-                        '<span class="status-pending">Payment Pending</span>'
-                    }
-                </div>
-            </div>
-        </div>
-    `).join('') : '<div class="text-gray-500 text-center">No pending orders</div>';
-
-    // Update completed orders
-    const completedOrdersContainer = document.getElementById('completed-orders');
-    completedOrdersContainer.innerHTML = completedOrders.length ? completedOrders.map(order => `
-        <div class="completed-order">
-            <div class="font-medium">Order #${order.id} - ₹${order.total}</div>
-            <div class="text-sm text-gray-600 mt-1">
-                ${order.items.map(item => `
-                    <div>${item.name} x${item.quantity}</div>
-                `).join('')}
-            </div>
-            <div class="text-xs text-gray-500 mt-1">
-                ${new Date(order.timestamp).toLocaleTimeString()}
-            </div>
-        </div>
-    `).join('') : '<div class="completed-order">No completed orders</div>';
-
-    // Update daily total
-    document.getElementById('daily-total').textContent = dailyTotal;
-
-    // Refresh Lucide icons
-    lucide.createIcons();
-}
-
-// Order Management Functions
-function createOrder(items) {
-    return {
-        id: currentOrderId++,
-        items: Object.entries(items).map(([name, item]) => ({
-            name,
-            quantity: item.quantity,
-            price: item.price,
-            completed: 0
-        })),
-        total: calculateTotal(items),
-        timestamp: new Date(),
-        paid: false,
-        allCompleted: false
-    };
-}
-
-function handlePayment(orderId) {
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-        const order = orders[orderIndex];
-        order.paid = true;
-        
-        // Check if all items are already served
-        const allItemsCompleted = order.items.every(item => item.completed === item.quantity);
-        
-        // If everything is served and now paid, move to completed
-        if (allItemsCompleted) {
-            completedOrders.push({
-                ...order,
-                status: 'completed',
-                completedAt: new Date()
-            });
-            orders.splice(orderIndex, 1);
-            dailyTotal += order.total;
-            showNotification('Order completed and moved to completed orders!');
-        } else {
-            showNotification('Payment received successfully!');
+    addToCart(item, quantity) {
+        if (!this.cart[item.name]) {
+            this.cart[item.name] = { ...item, quantity: 0 };
         }
-        
-        hidePaymentModal();
-        updateOrdersUI();
-        saveState(); // Save state after important changes
+        this.cart[item.name].quantity = Math.max(0, this.cart[item.name].quantity + quantity);
+        if (this.cart[item.name].quantity === 0) {
+            delete this.cart[item.name];
+        }
     }
-}
 
-function completeOrderItem(orderId, itemName, quantity) {
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-        const order = orders[orderIndex];
+    createOrder() {
+        const order = {
+            id: this.currentOrderId++,
+            items: Object.entries(this.cart).map(([name, item]) => ({
+                name,
+                quantity: item.quantity,
+                price: item.price,
+                served: 0
+            })),
+            total: this.calculateTotal(this.cart),
+            timestamp: new Date(),
+            isPaid: false,
+            isCompleted: false
+        };
+        this.pendingOrders.push(order);
+        this.cart = {};
+        return order;
+    }
+
+    calculateTotal(items) {
+        return Object.values(items).reduce((sum, item) => sum + (item.quantity * item.price), 0);
+    }
+
+    serveItem(orderId, itemName) {
+        const order = this.pendingOrders.find(o => o.id === orderId);
+        if (!order) return false;
+
         const item = order.items.find(i => i.name === itemName);
-        
-        if (item) {
-            // Update completed quantity
-            item.completed = Math.min(item.quantity, item.completed + quantity);
-            
-            // Check if all items in this order are completed
-            const allItemsCompleted = order.items.every(item => item.completed === item.quantity);
-            order.allCompleted = allItemsCompleted;
+        if (!item || item.served >= item.quantity) return false;
 
-            // If all items are completed and order is paid, move to completed orders
-            if (allItemsCompleted && order.paid) {
-                completedOrders.push({
-                    ...order,
-                    status: 'completed',
-                    completedAt: new Date()
-                });
-                orders.splice(orderIndex, 1);
-                dailyTotal += order.total;
-                showNotification('Order completed!');
-            } else {
-                showNotification('Item served!');
-            }
+        item.served++;
+        this.checkOrderCompletion(order);
+        return true;
+    }
 
-            updateOrdersUI();
-            saveState(); // Save state after important changes
+    markAsPaid(orderId) {
+        const order = this.pendingOrders.find(o => o.id === orderId);
+        if (!order) return false;
+
+        order.isPaid = true;
+        this.checkOrderCompletion(order);
+        return true;
+    }
+
+    checkOrderCompletion(order) {
+        const allServed = order.items.every(item => item.served === item.quantity);
+        if (allServed && order.isPaid && !order.isCompleted) {
+            order.isCompleted = true;
+            this.completeOrder(order);
         }
     }
-}
 
-function createOrder(items) {
-    return {
-        id: currentOrderId++,
-        items: Object.entries(items).map(([name, item]) => ({
-            name,
-            quantity: item.quantity,
-            price: item.price,
-            completed: 0  // Initialize completed count
-        })),
-        total: calculateTotal(items),
-        timestamp: new Date(),
-        paid: false,
-        allCompleted: false
-    };
-}
-
-function completeOrderItem(orderId, itemName, quantity) {
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-        const order = orders[orderIndex];
-        const item = order.items.find(i => i.name === itemName);
-        if (item) {
-            // Update completed quantity
-            item.completed = Math.min(item.quantity, item.completed + quantity);
-            
-            // Check if all items are completed
-            const allCompleted = order.items.every(item => item.completed === item.quantity);
-            order.allCompleted = allCompleted;
-
-            // If all items are completed and order is paid, move to completed orders
-            if (allCompleted && order.paid) {
-                completedOrders.push({...order, status: 'completed'});
-                orders.splice(orderIndex, 1);
-                dailyTotal += order.total;
-            }
-
-            updateOrdersUI();
-            showNotification(allCompleted ? 'Order completed!' : 'Item served!');
-        }
-    }
-}
-
-// Menu Management Functions
-function updateMenuItems() {
-    const menuItemsContainer = document.getElementById('menu-items');
-    menuItemsContainer.innerHTML = menuCategories[activeCategory]
-        .map(item => `
-            <div class="menu-item">
-                <div class="item-info">
-                    <h3>${item.name}</h3>
-                    <p>₹${item.price}</p>
-                </div>
-                <div class="quantity-controls">
-                    <button class="qty-btn minus" onclick='updateQuantity(${JSON.stringify(item)}, -1)'>-</button>
-                    <span>${cart[item.name]?.quantity || 0}</span>
-                    <button class="qty-btn plus" onclick='updateQuantity(${JSON.stringify(item)}, 1)'>+</button>
-                </div>
-            </div>
-        `).join('');
-}
-
-function changeCategory(category) {
-    activeCategory = category;
-    const tabs = document.querySelectorAll('.tab');
-    tabs.forEach(tab => {
-        tab.classList.toggle('active', tab.textContent.trim() === category);
-    });
-    updateMenuItems();
-}
-
-// Modal Functions
-function showConfirmModal() {
-    const modal = document.getElementById('confirm-modal');
-    const detailsContainer = document.getElementById('confirm-order-details');
-    
-    detailsContainer.innerHTML = `
-        ${Object.entries(cart).map(([name, item]) => `
-            <div class="cart-item">
-                <span>${name} x${item.quantity}</span>
-                <span>₹${item.price * item.quantity}</span>
-            </div>
-        `).join('')}
-        <div class="cart-total">
-            <span>Total</span>
-            <span>₹${calculateTotal(cart)}</span>
-        </div>
-    `;
-    
-    modal.style.display = 'flex';
-}
-
-function hideConfirmModal() {
-    document.getElementById('confirm-modal').style.display = 'none';
-}
-
-let currentPaymentOrderId = null; // Add this at the top with other state variables
-
-function showPaymentModal(orderId) {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-    
-    currentPaymentOrderId = orderId;
-    const modal = document.getElementById('payment-modal');
-    document.getElementById('payment-amount').textContent = order.total;
-    modal.style.display = 'flex';
-}
-
-function hidePaymentModal() {
-    currentPaymentOrderId = null;
-    document.getElementById('payment-modal').style.display = 'none';
-}
-
-function handlePayment(orderId) {
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-        const button = event.target;
-        button.disabled = true; // Prevent double-clicks
-        
-        orders[orderIndex].paid = true;
-        hidePaymentModal();
-        updateOrdersUI();
-        showNotification('Payment received successfully!');
-        
-        button.disabled = false;
-    }
-}
-
-function confirmOrder() {
-    if (Object.keys(cart).length === 0) return;
-    
-    const modal = document.getElementById('confirm-modal');
-    const detailsContainer = document.getElementById('confirm-order-details');
-    
-    detailsContainer.innerHTML = `
-        ${Object.entries(cart).map(([name, item]) => `
-            <div class="cart-item">
-                <span>${name} x${item.quantity}</span>
-                <span>₹${item.price * item.quantity}</span>
-            </div>
-        `).join('')}
-        <div class="cart-total">
-            <span>Total</span>
-            <span>₹${calculateTotal(cart)}</span>
-        </div>
-    `;
-    
-    modal.style.display = 'flex';
-}
-
-function completeOrderItem(orderId, itemName, quantity) {
-    const button = event.target;
-    button.disabled = true; // Prevent double-clicks
-    
-    const orderIndex = orders.findIndex(o => o.id === orderId);
-    if (orderIndex !== -1) {
-        const order = orders[orderIndex];
-        const item = order.items.find(i => i.name === itemName);
-        if (item) {
-            item.completed = Math.min(item.quantity, item.completed + quantity);
-            const allCompleted = order.items.every(item => item.completed === item.quantity);
-            order.allCompleted = allCompleted;
-
-            if (allCompleted && order.paid) {
-                completedOrders.push({...order, status: 'completed'});
-                orders.splice(orderIndex, 1);
-                dailyTotal += order.total;
-            }
-
-            updateOrdersUI();
-            showNotification(allCompleted ? 'Order completed!' : 'Item served!');
-            saveState();
-        }
-    }
-    
-    button.disabled = false;
-}
-
-// Add state persistence
-function saveState() {
-    const state = {
-        orders,
-        completedOrders,
-        dailyTotal,
-        currentOrderId
-    };
-    localStorage.setItem('posState', JSON.stringify(state));
-}
-
-function loadState() {
-    const savedState = localStorage.getItem('posState');
-    if (savedState) {
-        const state = JSON.parse(savedState);
-        orders = state.orders;
-        completedOrders = state.completedOrders;
-        dailyTotal = state.dailyTotal;
-        currentOrderId = state.currentOrderId;
-        updateUI();
-        updateOrdersUI();
-    }
-}
-
-// Update initialize function
-function initialize() {
-    // Existing initialization code...
-    
-    // Add payment modal event listeners
-    document.getElementById('payment-received').addEventListener('click', () => {
-        if (currentPaymentOrderId) {
-            handlePayment(currentPaymentOrderId);
-        }
-    });
-    
-    // Load saved state
-    loadState();
-}
-
-// Add error handling for all async operations
-window.addEventListener('error', function(e) {
-    console.error('Error:', e);
-    showNotification('An error occurred. Please try again.');
-});
-
-function hidePaymentModal() {
-    document.getElementById('payment-modal').style.display = 'none';
-}
-
-function placeOrder() {
-    if (Object.keys(cart).length === 0) return;
-    showConfirmModal();
-}
-
-function confirmOrder() {
-    const newOrder = createOrder(cart);
-    orders.push(newOrder);
-    cart = {};
-    hideConfirmModal();
-    showPaymentModal(newOrder.total);
-    updateUI();
-    updateOrdersUI();
-}
-
-// Fullscreen toggle
-function toggleFullscreen() {
-    if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(err => {
-            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+    completeOrder(order) {
+        this.pendingOrders = this.pendingOrders.filter(o => o.id !== order.id);
+        this.completedOrders.push({
+            ...order,
+            completedAt: new Date()
         });
-    } else {
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
+        this.dailyTotal += order.total;
+    }
+
+    saveState() {
+        localStorage.setItem('posState', JSON.stringify({
+            currentOrderId: this.currentOrderId,
+            pendingOrders: this.pendingOrders,
+            completedOrders: this.completedOrders,
+            dailyTotal: this.dailyTotal
+        }));
+    }
+
+    loadState() {
+        const saved = localStorage.getItem('posState');
+        if (saved) {
+            const state = JSON.parse(saved);
+            this.currentOrderId = state.currentOrderId;
+            this.pendingOrders = state.pendingOrders;
+            this.completedOrders = state.completedOrders;
+            this.dailyTotal = state.dailyTotal;
         }
     }
 }
 
-// Initialize
-function initialize() {
-    // Set current date
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    document.getElementById('current-date').textContent = now.toLocaleDateString('en-IN', options);
+// UI Controller
+class POSUI {
+    constructor(state) {
+        this.state = state;
+        this.bindEvents();
+        this.updateUI();
+    }
 
-    // Create category tabs
-    const tabsContainer = document.getElementById('category-tabs');
-    tabsContainer.innerHTML = Object.keys(menuCategories)
-        .map(category => `
-            <button class="tab ${category === activeCategory ? 'active' : ''}"
-                    onclick="changeCategory('${category}')">${category}</button>
-        `).join('');
+    showNotification(message) {
+        const notification = document.getElementById('notification');
+        notification.textContent = message;
+        notification.classList.add('show');
+        setTimeout(() => notification.classList.remove('show'), 3000);
+    }
 
-    // Initialize menu items
-    updateMenuItems();
+    updateUI() {
+        this.updateCart();
+        this.updateMenuItems();
+        this.updateOrders();
+    }
 
-    // Add event listeners
-    document.getElementById('place-order-btn').addEventListener('click', placeOrder);
-    document.getElementById('cancel-order').addEventListener('click', hideConfirmModal);
-    document.getElementById('confirm-order').addEventListener('click', confirmOrder);
-    document.getElementById('payment-pending').addEventListener('click', hidePaymentModal);
-    document.getElementById('payment-received').addEventListener('click', () => {
-        const lastOrderId = currentOrderId - 1;
-        handlePayment(lastOrderId);
-    });
+    updateCart() {
+        const cartContainer = document.getElementById('current-cart');
+        cartContainer.innerHTML = Object.entries(this.state.cart)
+            .map(([name, item]) => `
+                <div class="cart-item">
+                    <span>${name} x${item.quantity}</span>
+                    <span>₹${item.price * item.quantity}</span>
+                </div>
+            `).join('');
+
+        const total = this.state.calculateTotal(this.state.cart);
+        document.getElementById('cart-total').textContent = total;
+        document.getElementById('place-order-btn').disabled = total === 0;
+    }
+
+    updateMenuItems() {
+        const container = document.getElementById('menu-items');
+        container.innerHTML = menuCategories[this.state.activeCategory]
+            .map(item => `
+                <div class="menu-item">
+                    <div class="item-info">
+                        <h3>${item.name}</h3>
+                        <p>₹${item.price}</p>
+                    </div>
+                    <div class="quantity-controls">
+                        <button class="qty-btn minus" onclick="ui.updateQuantity(${JSON.stringify(item)}, -1)">-</button>
+                        <span>${this.state.cart[item.name]?.quantity || 0}</span>
+                        <button class="qty-btn plus" onclick="ui.updateQuantity(${JSON.stringify(item)}, 1)">+</button>
+                    </div>
+                </div>
+            `).join('');
+    }
+
+    updateOrders() {
+        // Update pending orders
+        const pendingContainer = document.getElementById('pending-orders');
+        pendingContainer.innerHTML = this.state.pendingOrders.length ? 
+            this.state.pendingOrders.map(order => `
+                <div class="pending-order">
+                    <div class="order-header">
+                        <span class="font-medium">Order #${order.id}</span>
+                        <div class="order-actions">
+                            ${!order.isPaid ? `
+                                <button class="action-btn payment-btn" onclick="ui.handlePayment(${order.id})">
+                                    <i data-lucide="dollar-sign"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="text-sm text-gray-600 mt-1">
+                        ${order.items.map(item => `
+                            <div class="order-item-status ${item.served === item.quantity ? 'completed' : ''}">
+                                <div>
+                                    ${item.name} x${item.quantity}
+                                    ${item.served > 0 ? ` (${item.served}/${item.quantity} served)` : ''}
+                                </div>
+                                ${item.served < item.quantity ? `
+                                    <button 
+                                        class="complete-item-btn"
+                                        onclick="ui.serveItem(${order.id}, '${item.name}')"
+                                    >
+                                        Serve
+                                    </button>
+                                ` : ''}
+                            </div>
+                        `).join('')}
+                        <div class="mt-1">Total: ₹${order.total}</div>
+                        <div class="text-xs mt-1">
+                            ${order.isPaid ? 
+                                '<span class="status-paid">Payment Received</span>' : 
+                                '<span class="status-pending">Payment Pending</span>'
+                            }
+                        </div>
+                    </div>
+                </div>
+            `).join('') : 
+            '<div class="text-gray-500 text-center">No pending orders</div>';
+
+        // Update completed orders
+        const completedContainer = document.getElementById('completed-orders');
+        completedContainer.innerHTML = this.state.completedOrders.length ?
+            this.state.completedOrders.map(order => `
+                <div class="completed-order">
+                    <div class="font-medium">Order #${order.id} - ₹${order.total}</div>
+                    <div class="text-sm text-gray-600 mt-1">
+                        ${order.items.map(item => `
+                            <div>${item.name} x${item.quantity}</div>
+                        `).join('')}
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        ${new Date(order.completedAt).toLocaleTimeString()}
+                    </div>
+                </div>
+            `).join('') :
+            '<div class="completed-order">No completed orders</div>';
+
+        // Update daily total
+        document.getElementById('daily-total').textContent = this.state.dailyTotal;
+
+        // Refresh icons
+        lucide.createIcons();
+    }
+
+    // Event Handlers
+    updateQuantity(item, change) {
+        this.state.addToCart(item, change);
+        this.updateUI();
+    }
+
+    changeCategory(category) {
+        this.state.activeCategory = category;
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.classList.toggle('active', tab.textContent === category);
+        });
+        this.updateMenuItems();
+    }
+
+    showConfirmModal() {
+        const modal = document.getElementById('confirm-modal');
+        const details = document.getElementById('confirm-order-details');
+        
+        details.innerHTML = `
+            ${Object.entries(this.state.cart).map(([name, item]) => `
+                <div class="cart-item">
+                    <span>${name} x${item.quantity}</span>
+                    <span>₹${item.price * item.quantity}</span>
+                </div>
+            `).join('')}
+            <div class="cart-total">
+                <span>Total</span>
+                <span>₹${this.state.calculateTotal(this.state.cart)}</span>
+            </div>
+        `;
+        
+        modal.style.display = 'flex';
+    }
+
+    hideConfirmModal() {
+        document.getElementById('confirm-modal').style.display = 'none';
+    }
+
+    showPaymentModal(orderId) {
+        const order = this.state.pendingOrders.find(o => o.id === orderId);
+        if (!order) return;
+
+        const modal = document.getElementById('payment-modal');
+        document.getElementById('payment-amount').textContent = order.total;
+        modal.dataset.orderId = orderId;
+        modal.style.display = 'flex';
+    }
+
+    hidePaymentModal() {
+        const modal = document.getElementById('payment-modal');
+        modal.dataset.orderId = '';
+        modal.style.display = 'none';
+    }
+
+    placeOrder() {
+        if (Object.keys(this.state.cart).length === 0) return;
+        this.showConfirmModal();
+    }
+
+    confirmOrder() {
+        const order = this.state.createOrder();
+        this.hideConfirmModal();
+        this.showPaymentModal(order.id);
+        this.updateUI();
+        this.state.saveState();
+    }
+
+    handlePayment(orderId) {
+        if (this.state.markAsPaid(orderId)) {
+            this.hidePaymentModal();
+            this.showNotification('Payment received successfully!');
+            this.updateUI();
+            this.state.saveState();
+        }
+    }
+
+    serveItem(orderId, itemName) {
+        if (this.state.serveItem(orderId, itemName)) {
+            this.updateUI();
+            this.state.saveState();
+        }
+    }
+
+    bindEvents() {
+        // Initial setup
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('current-date').textContent = now.toLocaleDateString('en-IN', options);
+
+        // Create category tabs
+        const tabsContainer = document.getElementById('category-tabs');
+        tabsContainer.innerHTML = Object.keys(menuCategories)
+            .map(category => `
+                <button class="tab ${category === this.state.activeCategory ? 'active' : ''}"
+                        onclick="ui.changeCategory('${category}')">${category}</button>
+            `).join('');
+
+        // Bind button events
+        document.getElementById('place-order-btn').addEventListener('click', () => this.placeOrder());
+        document.getElementById('cancel-order').addEventListener('click', () => this.hideConfirmModal());
+        document.getElementById('confirm-order').addEventListener('click', () => this.confirmOrder());
+        document.getElementById('payment-received').addEventListener('click', () => {
+            const orderId = parseInt(document.getElementById('payment-modal').dataset.orderId);
+            if (orderId) this.handlePayment(orderId);
+        });
+        document.getElementById('payment-pending').addEventListener('click', () => this.hidePaymentModal());
+    }
 }
 
-// Start the application
-document.addEventListener('DOMContentLoaded', initialize);
+// Initialize application
+const pos = new POSState();
+const ui = new POSUI(pos);
+
+// Load saved state
+pos.loadState();
